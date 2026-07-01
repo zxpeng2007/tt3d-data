@@ -40,6 +40,47 @@ def patch_rally() -> None:
         print("rally.py already patched / patterns not found")
 
 
+def patch_table_segmenter() -> None:
+    """Fix a loss-branch bug: the checkpoint's loss='DICE' matches the first `if`
+    but then falls through a separate `if/elif` chain to `raise ValueError`.
+    Making the second block an `elif` unifies them into one chain."""
+    f = TT3D / "tt3d" / "calibration" / "table_segmenter.py"
+    if not f.exists():
+        print(f"skip table_segmenter.py (missing {f})")
+        return
+    src = f.read_text(encoding="utf-8")
+    if '        if loss == "BCE+DICE":' in src:
+        src = src.replace('        if loss == "BCE+DICE":',
+                          '        elif loss == "BCE+DICE":', 1)
+        f.write_text(src, encoding="utf-8")
+        print("patched table_segmenter.py (loss if->elif)")
+    else:
+        print("table_segmenter.py already patched / pattern not found")
+
+
+def patch_calibration_utils() -> None:
+    """save_camcal() declares an 'error' column but, when errors is None, never
+    appends to it -> pandas 'All arrays must be of the same length'. Append NaN."""
+    f = TT3D / "tt3d" / "calibration" / "utils.py"
+    if not f.exists():
+        print(f"skip calibration/utils.py (missing {f})")
+        return
+    src = f.read_text(encoding="utf-8")
+    anchor = ('            data["f"].append(f)\n\n'
+              "    # Create a DataFrame and save it to a CSV file")
+    if anchor in src:
+        src = src.replace(
+            anchor,
+            '            data["f"].append(f)\n            data["error"].append(np.nan)\n\n'
+            "    # Create a DataFrame and save it to a CSV file",
+            1,
+        )
+        f.write_text(src, encoding="utf-8")
+        print("patched calibration/utils.py (save_camcal error column)")
+    else:
+        print("calibration/utils.py already patched / pattern not found")
+
+
 def patch_blurball_root() -> None:
     f = BLURBALL / "src" / "configs" / "global.yaml"
     if not f.exists():
@@ -52,6 +93,8 @@ def patch_blurball_root() -> None:
 
 def main() -> None:
     patch_rally()
+    patch_table_segmenter()
+    patch_calibration_utils()
     patch_blurball_root()
 
 
