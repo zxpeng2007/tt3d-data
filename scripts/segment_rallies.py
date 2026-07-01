@@ -129,7 +129,7 @@ def main() -> None:
 
     cfg = config.load_config()
     config.ensure_dirs()
-    videos = [p for p in sorted(args.videos.glob(args.glob))
+    videos = [p.resolve() for p in sorted(args.videos.glob(args.glob))
               if p.is_file() and ".f298" not in p.name and ".part" not in p.name]
     if not videos:
         LOG.warning("no videos under %s", args.videos)
