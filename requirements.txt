@@ -33,6 +33,16 @@ pytorch-lightning>=2.2
 
 # MotionBERT runtime
 easydict>=1.10
+ipdb>=0.13            # imported by MotionBERT dataset_wild
+einops>=0.7           # MotionBERT DSTformer + BlurBall models
+
+# BlurBall runtime (hydra-based inference)
+omegaconf>=2.3
+hydra-core>=1.3
+
+# TT3D table segmenter checkpoint logging import
+wandb>=0.16
+json-tricks>=3.17
 
 # Video sourcing / downloads
 yt-dlp>=2024.1

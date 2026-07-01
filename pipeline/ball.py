@@ -45,6 +45,9 @@ def _blurball_2d(rally_dir: Path, cfg: config.PipelineConfig) -> Path:
          f"+input_vid={str(rally_mp4).replace(chr(92), '/')}",
          f"detector.step={cfg.blurball_step}",
          f"detector.postprocessor.score_threshold={cfg.blurball_score_threshold}",
+         # Disable BlurBall's per-frame visualization (buggy draw_frame path); we
+         # only need traj.csv, which is written regardless.
+         "runner.vis_result=False", "runner.vis_hm=False", "runner.vis_traj=False",
          f"WASB_ROOT={wasb_root}",
          f"hydra.run.dir={run_dir}"],
         cwd=config.BLURBALL_DIR, env=env,
