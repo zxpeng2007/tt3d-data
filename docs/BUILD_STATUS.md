@@ -1,23 +1,25 @@
 # Build status
 
-Live checklist for bringing the scaled TT3D data pipeline online. Updated as stages are validated.
+Live checklist for bringing the scaled TT3D data pipeline online.
 
 | # | Stage | State | Notes |
 |---|-------|-------|-------|
-| 0 | GitHub repo created (`zxpeng2007/tt3d-data`, public) | ✅ done | |
+| 0 | GitHub repo (`zxpeng2007/tt3d-data`, public) | ✅ done | |
 | 1 | Repo scaffold (README, license, docs, .gitignore) | ✅ done | |
-| 2 | Python 3.12 venv | 🔄 in progress | Blackwell sm_120 → needs torch ≥ cu128 build |
-| 3 | ML stack install (torch, rtmlib, casadi, seg-models…) | ⬜ pending | recipe from research workflow |
-| 4 | Model weights (table seg, BlurBall, RTMPose, MotionBERT) | ⬜ pending | |
-| 5 | Vendored upstream (TT3D, BlurBall, MotionBERT) | ⬜ pending | |
-| 6 | Stage validation on sample rally — **table** | ⬜ pending | |
-| 7 | Stage validation on sample rally — **body** | ⬜ pending | |
-| 8 | Stage validation on sample rally — **ball** | ⬜ pending | |
-| 9 | Video download (WTT/ITTF via yt-dlp) | ⬜ pending | |
-| 10 | Rally segmentation | ⬜ pending | |
-| 11 | Pilot: 1 match → rallies → full reconstruction | ⬜ pending | end-to-end proof |
-| 12 | Batch orchestrator (resumable) | ⬜ pending | |
-| 13 | Bulk generation started (background) | ⬜ pending | target 100+ matches |
-| 14 | Dataset aggregation + manifest | ⬜ pending | |
+| 2 | Python 3.12 venv | ✅ done | `.venv` (CPython 3.12.13) |
+| 3 | torch cu128 (Blackwell sm_120) | ✅ done | torch 2.11.0+cu128, GPU verified on RTX 5080 |
+| 4 | Pipeline requirements (rtmlib, casadi, smp, …) | 🔄 installing | via uv |
+| 5 | Vendored upstream (TT3D, BlurBall, MotionBERT) | ✅ done | cloned into third_party/ |
+| 6 | Upstream patches (rally fps/int64, BlurBall root) | ⬜ pending | `scripts/patch_upstream.py` |
+| 7 | Model weights (BlurBall, MotionBERT) | ⬜ pending | table seg present; BlurBall/MB download |
+| 8 | Pipeline code (all stages + orchestration) | ✅ done | committed |
+| 9 | Validate — **table** (calibration) | ⬜ pending | on data/rallies/_demo |
+| 10 | Validate — **body** (pose→3D→world) | ⬜ pending | needs MotionBERT weight + a rally |
+| 11 | Validate — **ball** (BlurBall→3D) | ⬜ pending | needs BlurBall weight + a rally |
+| 12 | Pilot match download (WTT) | 🔄 running | 1 full match, 720p, background |
+| 13 | Rally segmentation | ⬜ pending | scene-cut + table presence |
+| 14 | Pilot: match → rallies → reconstruction | ⬜ pending | end-to-end proof |
+| 15 | Bulk generation (background) | ⬜ pending | target 100+ matches |
+| 16 | Dataset aggregation + manifest | ⬜ pending | |
 
 Legend: ✅ done · 🔄 in progress · ⬜ pending · ⚠️ blocked
