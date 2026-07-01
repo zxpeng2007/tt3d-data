@@ -34,7 +34,7 @@ PYTHON = str(VENV_PY if VENV_PY.exists() else Path(sys.executable))
 # Table segmentation ships inside upstream TT3D.
 TABLE_SEG_CKPT = TT3D_DIR / "weights" / "table_segmentation.ckpt"
 # BlurBall model (downloaded from the BlurBall Nextcloud into weights/).
-BLURBALL_CKPT = WEIGHTS_DIR / "blurball" / "blurball.pth.tar"
+BLURBALL_CKPT = WEIGHTS_DIR / "blurball" / "blurball_best"
 # MotionBERT lite checkpoint + config (downloaded into MotionBERT/checkpoint).
 MOTIONBERT_CONFIG = MOTIONBERT_DIR / "configs" / "pose3d" / "MB_ft_h36m_global_lite.yaml"
 MOTIONBERT_CKPT = (
