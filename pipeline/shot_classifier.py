@@ -4,6 +4,9 @@ Runs the upstream TT3D TableCalibrator, which returns a valid rotation only when
 the regulation table is detected -> a robust proxy for the behind-the-table
 broadcast (gameplay) camera vs. replays/crowd/close-ups.
 
+Frames are extracted with ffmpeg (not cv2.VideoCapture, which fails on the
+Unicode characters yt-dlp puts in filenames on Windows).
+
 Launch with cwd = <tt3d repo root> (so ./weights/table_segmentation.ckpt resolves)
 and PYTHONPATH += <tt3d repo>/tt3d/calibration (bare imports). Prints JSON:
     {"<seconds>": true/false, ...}
@@ -11,12 +14,21 @@ and PYTHONPATH += <tt3d repo>/tt3d/calibration (bare imports). Prints JSON:
 import argparse
 import json
 import os
+import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.join(os.getcwd(), "tt3d", "calibration"))
 
 import cv2
 import numpy as np
+
+
+def _extract_frame(video: str, ts: float, out_png: str) -> bool:
+    cmd = ["ffmpeg", "-y", "-ss", f"{ts:.3f}", "-i", video,
+           "-frames:v", "1", "-q:v", "2", out_png]
+    r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return r.returncode == 0 and os.path.isfile(out_png) and os.path.getsize(out_png) > 0
 
 
 def main() -> None:
@@ -27,27 +39,27 @@ def main() -> None:
 
     from table_calibrator import TableCalibrator
 
-    cap = cv2.VideoCapture(args.video)
-    if not cap.isOpened():
-        print(json.dumps({}))
-        return
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    calibrator = TableCalibrator(h, w)
-
+    tss = [float(x) for x in args.timestamps.split(",") if x != ""]
     result = {}
-    for ts in [float(x) for x in args.timestamps.split(",") if x != ""]:
-        cap.set(cv2.CAP_PROP_POS_MSEC, ts * 1000.0)
-        ok, frame = cap.read()
-        if not ok:
-            result[str(ts)] = False
-            continue
-        try:
-            rvec, tvec, f, er, _ = calibrator.process(frame, debug=True)
-            result[str(ts)] = rvec is not None
-        except Exception:
-            result[str(ts)] = False
-    cap.release()
+    calibrator = None
+    with tempfile.TemporaryDirectory() as tmp:
+        for i, ts in enumerate(tss):
+            png = os.path.join(tmp, f"f{i}.png")
+            if not _extract_frame(args.video, ts, png):
+                result[str(ts)] = False
+                continue
+            frame = cv2.imread(png)
+            if frame is None:
+                result[str(ts)] = False
+                continue
+            if calibrator is None:
+                h, w = frame.shape[:2]
+                calibrator = TableCalibrator(h, w)
+            try:
+                rvec, tvec, f, er, _ = calibrator.process(frame, debug=True)
+                result[str(ts)] = rvec is not None
+            except Exception:
+                result[str(ts)] = False
     print(json.dumps(result))
 
 

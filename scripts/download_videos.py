@@ -76,6 +76,7 @@ def main() -> None:
                 "--download-archive", str(archive),
                 "--write-info-json",
                 "--no-overwrites",
+                "--restrict-filenames",  # ASCII-only names (cv2/Windows Unicode safety)
                 "--concurrent-fragments", "8",
                 "--retries", "10", "--fragment-retries", "10",
                 "--sleep-requests", str(cfg.get("sleep_requests", 1)),
