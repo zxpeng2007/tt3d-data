@@ -14,10 +14,8 @@ Env overrides for robustness:
 from __future__ import annotations
 
 import argparse
-import io
 import os
 import sys
-import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

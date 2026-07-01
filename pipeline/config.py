@@ -72,7 +72,7 @@ class PipelineConfig:
     blurball_score_threshold: float = 0.7
 
     # rtmlib 2D pose
-    rtmpose_mode: str = "performance"   # 'performance' | 'lightweight' | 'balanced'
+    rtmpose_mode: str = "balanced"      # 'performance' | 'balanced' | 'lightweight'
     det_score_threshold: float = 0.45
     min_player_track_frames: int = 15   # a valid player must persist this long
 

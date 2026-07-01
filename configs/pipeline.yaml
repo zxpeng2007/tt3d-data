@@ -10,7 +10,7 @@ blurball_step: 1
 blurball_score_threshold: 0.7
 
 # rtmlib 2D pose
-rtmpose_mode: performance      # performance | balanced | lightweight
+rtmpose_mode: balanced         # performance | balanced | lightweight
 det_score_threshold: 0.45
 min_player_track_frames: 15
 
