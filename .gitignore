@@ -1,0 +1,46 @@
+# ---- Large / generated / copyrighted artifacts (never commit) ----
+# Downloaded broadcast footage (copyrighted — private use only)
+data/videos/
+data/matches/
+*.mp4
+*.mkv
+*.webm
+*.part
+*.ytdl
+
+# Per-rally working dirs and rendered outputs
+data/rallies/
+data/work/
+**/3d_render.mp4
+
+# Model weights (downloaded via scripts/download_weights.py)
+weights/*
+!weights/.gitkeep
+*.ckpt
+*.pth
+*.onnx
+*.bin
+*.safetensors
+
+# The generated dataset payload (numeric). Small samples may be force-added.
+data/dataset/*
+!data/dataset/.gitkeep
+!data/dataset/samples/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+
+# Vendored upstream repos are pulled by setup (kept out of git; see third_party/README)
+third_party/tt3d/
+third_party/blurball/
+third_party/MotionBERT/
+
+# Logs / scratch
+logs/
+*.log
+.DS_Store
