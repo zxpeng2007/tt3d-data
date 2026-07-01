@@ -88,6 +88,18 @@ def run_table(
     if not cam_cal.exists():
         raise StageError(f"calibrate.py did not produce {cam_cal}")
 
+    # Guard: filter.py crashes cryptically (pykalman) when there are no/too few
+    # valid observations. Fail fast with a clear reason instead.
+    import pandas as pd
+    df = pd.read_csv(cam_cal)
+    cols = ["f", "rvec_x", "rvec_y", "rvec_z", "tvec_x", "tvec_y", "tvec_z"]
+    n_valid = int((~(df[cols] == 0).all(axis=1)).sum())
+    if n_valid < 5:
+        raise StageError(
+            f"too few valid table observations ({n_valid}/{len(df)} frames) — "
+            "clip has no calibratable table view"
+        )
+
     # 2) Kalman-filter to a single static camera -> camera.yaml (next to cam_cal.csv)
     run(
         [config.PYTHON, "tt3d/calibration/filter.py", str(cam_cal),
