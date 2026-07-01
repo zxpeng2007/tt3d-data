@@ -1,0 +1,27 @@
+# Pipeline runtime configuration (overlays pipeline/config.py defaults).
+
+# Canonical video normalization
+canonical_fps: 25
+min_rally_seconds: 1.5
+max_rally_seconds: 40.0
+
+# BlurBall inference
+blurball_step: 1
+blurball_score_threshold: 0.7
+
+# rtmlib 2D pose
+rtmpose_mode: performance      # performance | balanced | lightweight
+det_score_threshold: 0.45
+min_player_track_frames: 15
+
+# Rally segmentation
+scene_cut_threshold: 0.35
+table_presence_min: 0.015
+gameplay_min_seconds: 2.0
+
+# Quality gates for keeping a rally
+min_ball_coverage: 0.25
+require_two_players: true
+
+# Debug rendering (slow) — keep off for bulk generation
+render_debug_video: false

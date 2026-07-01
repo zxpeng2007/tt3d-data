@@ -1,0 +1,36 @@
+# WTT / ITTF full-match video sources (verified live with yt-dlp).
+#
+# Full matches are identified by the "FULL MATCH |" title prefix on both official
+# channels and use the standard behind-the-table broadcast camera. They are
+# 1080p/720p @ 50 fps (the pipeline normalizes to 25 fps canonically).
+#
+# Copyrighted footage — private research/training use only; videos are git-ignored.
+
+# yt-dlp selection
+match_filter: "title ~= '(?i)full match' & duration > 600"   # full matches, exclude teasers/highlights
+# 720p50 H.264 (~1 GB/hr) by default; raise to 1080 for higher quality (~2 GB/hr).
+max_height: 720
+format: "bv*[height<={max_height}][fps<=50][vcodec^=avc1]+ba[ext=m4a]/b[height<={max_height}]"
+merge_output_format: mp4
+# polite rate-limiting for large batch sweeps
+sleep_requests: 1
+sleep_interval: 5
+max_sleep_interval: 15
+
+# Channel-wide sweeps (each yields many full matches across the channel's history)
+channels:
+  - name: WTTGlobal
+    url: "https://www.youtube.com/@WTTGlobal/videos"
+  - name: ITTFWorld
+    url: "https://www.youtube.com/@ITTFWorld/videos"
+
+# Curated completed-event playlists (verified to contain real full matches)
+playlists:
+  - name: ittf-worlds-doha-2025          # 21 full matches verified
+    url: "https://www.youtube.com/playlist?list=PLIl_mJ3zK7B_9i5lyw_nZB9LlwyFiser3"
+  - name: wtt-champions-chongqing-2026
+    url: "https://www.youtube.com/playlist?list=PLIl_mJ3zK7B-eBbvwcbHTuEFB3HSsXF9z"
+  - name: wtt-us-smash-2026
+    url: "https://www.youtube.com/playlist?list=PLIl_mJ3zK7B-_U-SCtg6ugoAMYt5d3Urr"
+  - name: wtt-star-contender-ljubljana-2026
+    url: "https://www.youtube.com/playlist?list=PLIl_mJ3zK7B_823MYPAUsdMxcDNeg5O5U"

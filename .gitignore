@@ -43,4 +43,5 @@ third_party/MotionBERT/
 # Logs / scratch
 logs/
 *.log
+logs_*.txt
 .DS_Store

@@ -1,0 +1,41 @@
+# Pipeline dependencies (torch/torchvision are installed separately by
+# scripts/setup_env.py via uv against the cu128 index for Blackwell GPUs).
+#
+# numpy pinned <2 for compatibility with the upstream research code
+# (MotionBERT / TT3D use APIs removed in numpy 2.x).
+numpy==1.26.4
+scipy>=1.11,<1.14
+pandas>=2.0
+opencv-python>=4.9
+Pillow>=10.2
+PyYAML>=6.0
+tqdm>=4.66
+matplotlib>=3.8
+imageio>=2.34
+imageio-ffmpeg>=0.5
+scikit-image>=0.22
+
+# 2D pose (RTMDet+RTMPose without mmcv)
+rtmlib>=0.0.13
+onnxruntime-gpu>=1.20
+
+# Ball physics / camera filtering (TT3D)
+casadi>=3.6
+pykalman>=0.9.7
+
+# Table segmenter (TT3D) — lightning checkpoint + smp backbone
+segmentation-models-pytorch>=0.3.4
+timm>=0.9.2
+efficientnet-pytorch>=0.7.1
+albumentations>=1.4
+lightning>=2.2
+pytorch-lightning>=2.2
+
+# MotionBERT runtime
+easydict>=1.10
+
+# Video sourcing / downloads
+yt-dlp>=2024.1
+gdown>=5.1
+requests>=2.31
+pyarrow>=15.0
