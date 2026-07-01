@@ -37,7 +37,8 @@ def detect_cuts(video: Path, threshold: float) -> list[float]:
         "-filter:v", f"scale=320:-2,select='gt(scene,{threshold})',showinfo",
         "-f", "null", "-",
     ]
-    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                          text=True, encoding="utf-8", errors="replace")
     times = sorted({float(m) for m in _PTS.findall(proc.stderr or "")})
     return times
 
@@ -54,7 +55,8 @@ def classify(video: Path, timestamps: list[float]) -> dict[float, bool]:
     cmd = [config.PYTHON, str((config.REPO_ROOT / "pipeline" / "shot_classifier.py").resolve()),
            "--video", str(video), "--timestamps", ts_arg]
     proc = subprocess.run(cmd, cwd=str(config.TT3D_DIR), env=env,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, encoding="utf-8", errors="replace")
     try:
         raw = json.loads(proc.stdout.strip().splitlines()[-1])
         return {float(k): bool(v) for k, v in raw.items()}

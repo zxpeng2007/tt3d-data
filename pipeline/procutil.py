@@ -11,6 +11,14 @@ from pathlib import Path
 
 _LOG_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s"
 
+# This machine's console/locale is GBK (Chinese Windows). Force UTF-8 on our
+# stdio so logging filenames/output with non-GBK characters never crash.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 def get_logger(name: str = "tt3d-data") -> logging.Logger:
     logger = logging.getLogger(name)
@@ -53,6 +61,8 @@ def run(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=timeout,
     )
     if log_path is not None:
@@ -80,7 +90,8 @@ def ffprobe(video: Path | str) -> dict:
         "-show_entries", "format=duration",
         "-of", "json", video,
     ]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0:
         raise StageError(f"ffprobe failed for {video}: {proc.stderr}")
     info = json.loads(proc.stdout)
