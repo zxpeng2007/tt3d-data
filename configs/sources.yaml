@@ -6,8 +6,10 @@
 #
 # Copyrighted footage — private research/training use only; videos are git-ignored.
 
-# yt-dlp selection
-match_filter: "title ~= '(?i)full match' & duration > 600"   # full matches, exclude teasers/highlights
+# yt-dlp selection.
+# Full matches, exclude teasers/highlights, and prefer SINGLES: TT3D assumes two
+# players, so we drop doubles (MD/WD/XD round codes in the title).
+match_filter: "title ~= '(?i)full match' & duration > 600 & title !~= '(?i)\\b[MWX]D\\b'"
 # 720p50 H.264 (~1 GB/hr) by default; raise to 1080 for higher quality (~2 GB/hr).
 max_height: 720
 format: "bv*[height<={max_height}][fps<=50][vcodec^=avc1]+ba[ext=m4a]/b[height<={max_height}]"
