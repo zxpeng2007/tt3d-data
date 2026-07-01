@@ -95,6 +95,8 @@ def segment_match(video: Path, out_root: Path, cfg: config.PipelineConfig) -> in
 
     mids = [(s + e) / 2.0 for s, e in shots]
     flags = classify(video, mids, cfg.table_presence_min)
+    n_game = sum(1 for mid in mids if flags.get(round(mid, 3), flags.get(mid, False)))
+    LOG.info("%s: %d/%d shots classified gameplay", match_id, n_game, len(shots))
 
     n = 0
     for (s, e), mid in zip(shots, mids):
