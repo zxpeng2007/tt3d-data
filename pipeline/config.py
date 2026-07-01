@@ -78,7 +78,7 @@ class PipelineConfig:
 
     # Rally segmentation thresholds
     scene_cut_threshold: float = 0.35   # ffmpeg scene score for a hard cut
-    table_presence_min: float = 0.015   # min fraction of frame that is table mask
+    table_presence_min: float = 0.02    # min table-mask frame fraction for gameplay
     gameplay_min_seconds: float = 2.0
 
     # Quality gates for keeping a reconstructed rally

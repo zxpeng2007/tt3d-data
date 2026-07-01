@@ -1,8 +1,9 @@
 """Standalone: classify sampled frames as 'gameplay' (table visible) or not.
 
-Runs the upstream TT3D TableCalibrator, which returns a valid rotation only when
-the regulation table is detected -> a robust proxy for the behind-the-table
-broadcast (gameplay) camera vs. replays/crowd/close-ups.
+Uses the upstream TT3D table segmentation model (via TableCalibrator.segment) and
+flags a frame as gameplay when the table mask covers at least --threshold of the
+frame. Mask presence is a far more robust gameplay signal than a full Hough+PnP
+calibration, which succeeds only on sparse clean frames.
 
 Frames are extracted with ffmpeg (not cv2.VideoCapture, which fails on the
 Unicode characters yt-dlp puts in filenames on Windows).
@@ -35,6 +36,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--video", required=True)
     ap.add_argument("--timestamps", required=True, help="comma-separated seconds to sample")
+    ap.add_argument("--threshold", type=float, default=0.015,
+                    help="min table-mask fraction of the frame to count as gameplay")
     args = ap.parse_args()
 
     from table_calibrator import TableCalibrator
@@ -56,8 +59,9 @@ def main() -> None:
                 h, w = frame.shape[:2]
                 calibrator = TableCalibrator(h, w)
             try:
-                rvec, tvec, f, er, _ = calibrator.process(frame, debug=True)
-                result[str(ts)] = rvec is not None
+                mask = calibrator.segment(frame)          # uint8 table mask
+                frac = float((mask > 0).mean())
+                result[str(ts)] = frac >= args.threshold
             except Exception:
                 result[str(ts)] = False
     print(json.dumps(result))

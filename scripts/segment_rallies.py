@@ -43,17 +43,17 @@ def detect_cuts(video: Path, threshold: float) -> list[float]:
     return times
 
 
-def classify(video: Path, timestamps: list[float]) -> dict[float, bool]:
-    """Classify sampled timestamps as gameplay via the TT3D calibrator subprocess."""
+def classify(video: Path, timestamps: list[float], threshold: float) -> dict[float, bool]:
+    """Classify sampled timestamps as gameplay (table mask present) via subprocess."""
     if not timestamps:
         return {}
     import os
-    env = {**os.environ, "MPLBACKEND": "Agg"}
+    env = {**os.environ, "MPLBACKEND": "Agg", "PYTHONUTF8": "1"}
     calib = config.TT3D_DIR / "tt3d" / "calibration"
     env["PYTHONPATH"] = os.pathsep.join([str(calib), env.get("PYTHONPATH", "")])
     ts_arg = ",".join(f"{t:.3f}" for t in timestamps)
     cmd = [config.PYTHON, str((config.REPO_ROOT / "pipeline" / "shot_classifier.py").resolve()),
-           "--video", str(video), "--timestamps", ts_arg]
+           "--video", str(video), "--timestamps", ts_arg, "--threshold", str(threshold)]
     proc = subprocess.run(cmd, cwd=str(config.TT3D_DIR), env=env,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           text=True, encoding="utf-8", errors="replace")
@@ -94,7 +94,7 @@ def segment_match(video: Path, out_root: Path, cfg: config.PipelineConfig) -> in
     LOG.info("%s: %.0fs, %d shots", match_id, duration, len(shots))
 
     mids = [(s + e) / 2.0 for s, e in shots]
-    flags = classify(video, mids)
+    flags = classify(video, mids, cfg.table_presence_min)
 
     n = 0
     for (s, e), mid in zip(shots, mids):

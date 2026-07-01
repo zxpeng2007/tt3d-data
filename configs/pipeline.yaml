@@ -16,7 +16,7 @@ min_player_track_frames: 15
 
 # Rally segmentation
 scene_cut_threshold: 0.35
-table_presence_min: 0.015
+table_presence_min: 0.02
 gameplay_min_seconds: 2.0
 
 # Quality gates for keeping a rally
