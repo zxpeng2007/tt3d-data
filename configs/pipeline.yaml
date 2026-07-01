@@ -15,9 +15,9 @@ det_score_threshold: 0.45
 min_player_track_frames: 15
 
 # Rally segmentation
-scene_cut_threshold: 0.35
 table_presence_min: 0.02
 gameplay_min_seconds: 2.0
+gameplay_merge_gap: 5.0
 
 # Quality gates for keeping a rally
 min_ball_coverage: 0.25

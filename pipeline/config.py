@@ -77,9 +77,9 @@ class PipelineConfig:
     min_player_track_frames: int = 15   # a valid player must persist this long
 
     # Rally segmentation thresholds
-    scene_cut_threshold: float = 0.35   # ffmpeg scene score for a hard cut
     table_presence_min: float = 0.02    # min table-mask frame fraction for gameplay
     gameplay_min_seconds: float = 2.0
+    gameplay_merge_gap: float = 5.0     # bridge cutaways up to this many seconds
 
     # Quality gates for keeping a reconstructed rally
     min_ball_coverage: float = 0.25     # fraction of frames with a ball detection
