@@ -49,9 +49,17 @@ def _project(pts_world, rvec, tvec, K):
 
 
 def _plausible_ball(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop physically-impossible reconstructed points using the table geometry:
-    ball must be on/above the surface and within a sane play volume."""
-    return df[(df.z > -0.15) & (df.z < 1.2) & (df.x.abs() < 1.5) & (df.y.abs() < 3.0)]
+    """Drop physically-impossible reconstructed points using the table geometry.
+
+    A near-surface point is a bounce and MUST lie on the table; higher points are
+    flight and may extend modestly beyond the ends (players hit from behind them).
+    The depth axis (Y) is the camera's line of sight and least-constrained, so this
+    is what removes the divergent 'bounces past the end' that stretch the plot.
+    """
+    on_surface = df.z.abs() < 0.06
+    keep = ((df.z > -0.12) & (df.z < 1.2) & (df.x.abs() < 1.1) & (df.y.abs() < 2.2)
+            & ~(on_surface & ((df.x.abs() > _W + 0.15) | (df.y.abs() > _L + 0.15))))
+    return df[keep]
 
 # H36M-17 skeleton (MotionBERT output order)
 H36M_EDGES = [(0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6), (0, 7), (7, 8),
@@ -190,15 +198,16 @@ def render_summary(rally_dir: Path, out: Path) -> None:
     _draw_table(ax); _draw_skel(ax, p0[mid], "#1f77ff"); _draw_skel(ax, p1[mid], "#ff3b3b")
     ax.plot(bt[:, 0], bt[:, 1], bt[:, 2], color="#00c000", lw=2)
     _setup(ax, bt); ax.view_init(elev=20, azim=-70); ax.set_title("3D scene (frame %d)" % mid)
-    # top-down
+    # top-down: table LENGTH horizontal (conventional), net = vertical line at Y=0
     ax2 = fig.add_subplot(142)
     W, L = config.TABLE_WIDTH / 2, config.TABLE_LENGTH / 2
-    ax2.add_patch(plt.Rectangle((-W, -L), 2 * W, 2 * L, fill=False, ec="#1f6f4a", lw=2))
-    ax2.axhline(0, color="#1f6f4a", lw=1, alpha=0.5)
-    ax2.plot(bt[:, 0], bt[:, 1], color="#00c000", lw=2, label="ball")
-    ax2.plot(p0[:, 0, 0], p0[:, 0, 1], ".", color="#1f77ff", ms=3, label="player0")
-    ax2.plot(p1[:, 0, 0], p1[:, 0, 1], ".", color="#ff3b3b", ms=3, label="player1")
-    ax2.set_title("Top-down (X-Y)"); ax2.set_xlabel("X (m)"); ax2.set_ylabel("Y (m)")
+    ax2.add_patch(plt.Rectangle((-L, -W), 2 * L, 2 * W, fill=False, ec="#1f6f4a", lw=2))
+    ax2.axvline(0, color="#1f6f4a", lw=1.5, alpha=0.7)  # net
+    ax2.plot(bt[:, 1], bt[:, 0], color="#00c000", lw=2, label="ball")
+    ax2.plot(p0[:, 0, 1], p0[:, 0, 0], ".", color="#1f77ff", ms=3, label="player0")
+    ax2.plot(p1[:, 0, 1], p1[:, 0, 0], ".", color="#ff3b3b", ms=3, label="player1")
+    ax2.set_title("Top-down (length = horizontal)")
+    ax2.set_xlabel("Y  table length (m)"); ax2.set_ylabel("X  width (m)")
     ax2.set_aspect("equal"); ax2.legend(fontsize=7)
     # side (Y-Z): ball flight + bounce
     ax3 = fig.add_subplot(143)

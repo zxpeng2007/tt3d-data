@@ -100,9 +100,12 @@ def _filter_ball_3d(csv_path: Path, cfg: config.PipelineConfig) -> None:
         df = pd.read_csv(csv_path)
     except Exception:
         return
-    half_w = config.TABLE_WIDTH / 2 + 1.0     # allow reaching wide of the table
-    half_l = config.TABLE_LENGTH / 2 + 1.6    # allow serving behind the end lines
-    keep = (df["z"] > -0.15) & (df["z"] < 1.5) & (df["x"].abs() < half_w) & (df["y"].abs() < half_l)
+    hw, hl = config.TABLE_WIDTH / 2, config.TABLE_LENGTH / 2
+    on_surface = df["z"].abs() < 0.06
+    keep = ((df["z"] > -0.12) & (df["z"] < 1.5)
+            & (df["x"].abs() < hw + 0.9) & (df["y"].abs() < hl + 0.8)
+            # a bounce (near surface) must actually be on the table
+            & ~(on_surface & ((df["x"].abs() > hw + 0.15) | (df["y"].abs() > hl + 0.15))))
     dropped = int((~keep).sum())
     if dropped:
         df[keep].to_csv(csv_path, index=False)
