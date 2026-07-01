@@ -84,7 +84,29 @@ def _reconstruct_3d(rally_dir: Path, cfg: config.PipelineConfig) -> Path:
     )
     if not out_csv.exists():
         raise StageError(f"rally.py did not produce {out_csv}")
+    _filter_ball_3d(out_csv, cfg)
     return out_csv
+
+
+def _filter_ball_3d(csv_path: Path, cfg: config.PipelineConfig) -> None:
+    """Drop physically-impossible reconstructed 3D ball points.
+
+    rally.py's per-segment physics solve occasionally diverges, placing points
+    below the table or far outside the play volume. The table is a fixed metric
+    reference, so we can reject anything on the wrong side of it.
+    """
+    import pandas as pd
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return
+    half_w = config.TABLE_WIDTH / 2 + 1.0     # allow reaching wide of the table
+    half_l = config.TABLE_LENGTH / 2 + 1.6    # allow serving behind the end lines
+    keep = (df["z"] > -0.15) & (df["z"] < 1.5) & (df["x"].abs() < half_w) & (df["y"].abs() < half_l)
+    dropped = int((~keep).sum())
+    if dropped:
+        df[keep].to_csv(csv_path, index=False)
+        LOG.info("[ball] dropped %d implausible 3D points (kept %d)", dropped, int(keep.sum()))
 
 
 def run_ball(rally_dir: Path | str, cfg: config.PipelineConfig, force: bool = False) -> Path:

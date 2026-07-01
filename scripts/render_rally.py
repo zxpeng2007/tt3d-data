@@ -23,8 +23,35 @@ import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import yaml
 
 from pipeline import config
+
+# The regulation table is a CONSTANT metric reference: projecting it with the
+# estimated camera is both a calibration QC and the table outline drawn in 2D.
+_W, _L, _NET = config.TABLE_WIDTH / 2, config.TABLE_LENGTH / 2, config.NET_HEIGHT
+TABLE_CORNERS = np.array([[-_W, -_L, 0], [_W, -_L, 0], [_W, _L, 0], [-_W, _L, 0]], float)
+NET_QUAD = np.array([[-_W, 0, 0], [_W, 0, 0], [_W, 0, _NET], [-_W, 0, _NET]], float)
+CENTER_LINE = np.array([[0, -_L, 0], [0, _L, 0]], float)
+
+
+def _load_cam(rally_dir: Path):
+    c = yaml.safe_load((rally_dir / "camera.yaml").read_text(encoding="utf-8"))
+    rvec = np.array(c["rvec"], float).reshape(3, 1)
+    tvec = np.array(c["tvec"], float).reshape(3, 1)
+    K = np.array([[c["f"], 0, c["w"] / 2], [0, c["f"], c["h"] / 2], [0, 0, 1]], float)
+    return rvec, tvec, K
+
+
+def _project(pts_world, rvec, tvec, K):
+    img, _ = cv2.projectPoints(np.asarray(pts_world, float).reshape(-1, 1, 3), rvec, tvec, K, None)
+    return img.reshape(-1, 2)
+
+
+def _plausible_ball(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop physically-impossible reconstructed points using the table geometry:
+    ball must be on/above the surface and within a sane play volume."""
+    return df[(df.z > -0.15) & (df.z < 1.2) & (df.x.abs() < 1.5) & (df.y.abs() < 3.0)]
 
 # H36M-17 skeleton (MotionBERT output order)
 H36M_EDGES = [(0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6), (0, 7), (7, 8),
@@ -39,6 +66,7 @@ GREEN = (0, 230, 0)
 
 def _ball_by_frame(rally_dir: Path, n_frames: int):
     df = pd.read_csv(rally_dir / "ball_traj_3D.csv").drop_duplicates("idx")
+    df = _plausible_ball(df)
     pos = {int(r.idx): (r.x, r.y, r.z) for r in df.itertuples()}
     xs = np.array(sorted(pos))
     return pos, xs, df
@@ -55,6 +83,12 @@ def render_2d(rally_dir: Path, out: Path) -> None:
         f = int(it["image_id"].split(".")[0])
         poses[it["idx"]][f] = np.array(it["keypoints"]).reshape(-1, 3)
 
+    # Project the constant-geometry table with the estimated camera (calibration QC).
+    rvec, tvec, K = _load_cam(rally_dir)
+    tbl = _project(TABLE_CORNERS, rvec, tvec, K).astype(int)
+    net = _project(NET_QUAD, rvec, tvec, K).astype(int)
+    ctr = _project(CENTER_LINE, rvec, tvec, K).astype(int)
+
     writer = imageio.get_writer(out, fps=fps, macro_block_size=None)
     trail = []
     i = 0
@@ -62,6 +96,10 @@ def render_2d(rally_dir: Path, out: Path) -> None:
         ok, frame = cap.read()
         if not ok:
             break
+        # projected table outline (yellow), net (cyan), centre line
+        cv2.polylines(frame, [tbl], True, (0, 255, 255), 2)
+        cv2.polylines(frame, [net], True, (255, 220, 0), 2)
+        cv2.line(frame, tuple(ctr[0]), tuple(ctr[1]), (0, 255, 255), 1)
         # 2D skeletons
         for pid, color in ((0, BLUE), (1, RED)):
             kp = poses[pid].get(i)
