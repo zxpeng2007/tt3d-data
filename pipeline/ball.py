@@ -88,10 +88,21 @@ def _reconstruct_3d(rally_dir: Path, cfg: config.PipelineConfig) -> Path:
 
 
 def run_ball(rally_dir: Path | str, cfg: config.PipelineConfig, force: bool = False) -> Path:
+    """Produce 2D ball detections (required) and best-effort 3D reconstruction.
+
+    The 2D track (ball_traj_2D.csv) is the primary ball-position deliverable and is
+    always kept. The 3D physics solve (rally.py) is fragile on clips that aren't a
+    single clean rally, so its failure is non-fatal: we log and return the 2D path.
+    """
     rally_dir = Path(rally_dir).resolve()
     out_csv = rally_dir / "ball_traj_3D.csv"
     if out_csv.exists() and not force:
         LOG.info("[ball] ball_traj_3D.csv exists, skipping (%s)", rally_dir.name)
         return out_csv
-    _blurball_2d(rally_dir, cfg)
-    return _reconstruct_3d(rally_dir, cfg)
+    ball2d = _blurball_2d(rally_dir, cfg)   # raises if BlurBall itself fails
+    try:
+        return _reconstruct_3d(rally_dir, cfg)
+    except StageError as exc:
+        LOG.warning("[ball] 3D reconstruction failed for %s (keeping 2D): %s",
+                    rally_dir.name, str(exc).splitlines()[0])
+        return ball2d

@@ -22,7 +22,8 @@ from pipeline import config
 
 COLUMNS = [
     "match_id", "rally_id", "source_url", "n_frames", "fps", "width", "height",
-    "calib_ok", "has_ball_3d", "has_pose_p0", "has_pose_p1", "ball_coverage", "ok", "path",
+    "calib_ok", "has_ball_2d", "has_ball_3d", "has_pose_p0", "has_pose_p1",
+    "ball_coverage", "ok", "path",
 ]
 
 
@@ -48,6 +49,7 @@ def main() -> None:
             "width": m.get("width", 0),
             "height": m.get("height", 0),
             "calib_ok": bool(q.get("calib_ok", m.get("calib_ok", False))),
+            "has_ball_2d": bool(q.get("has_ball_2d", False)),
             "has_ball_3d": bool(q.get("has_ball_3d", False)),
             "has_pose_p0": bool(q.get("has_pose_p0", False)),
             "has_pose_p1": bool(q.get("has_pose_p1", False)),
@@ -65,6 +67,7 @@ def main() -> None:
         "n_ok": int(df["ok"].sum()) if len(df) else 0,
         "n_matches": int(df["match_id"].nunique()) if len(df) else 0,
         "total_frames": int(df["n_frames"].sum()) if len(df) else 0,
+        "with_ball_2d": int(df["has_ball_2d"].sum()) if len(df) else 0,
         "with_ball_3d": int(df["has_ball_3d"].sum()) if len(df) else 0,
         "with_both_poses": int((df["has_pose_p0"] & df["has_pose_p1"]).sum()) if len(df) else 0,
         "mean_ball_coverage": round(float(df.loc[df["ok"], "ball_coverage"].mean()), 3)

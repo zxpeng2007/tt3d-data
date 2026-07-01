@@ -30,6 +30,7 @@ class RallyResult:
     height: int = 0
     stages: dict = field(default_factory=dict)      # stage -> "ok" | "error: ..."
     ball_coverage: float = 0.0
+    has_ball_2d: bool = False
     has_ball_3d: bool = False
     has_pose_p0: bool = False
     has_pose_p1: bool = False
@@ -108,16 +109,28 @@ def process_rally(
     if "ball" in stages and res.calib_ok:
         try:
             ball.run_ball(rally_dir, cfg, force=force)
+            res.has_ball_2d = (rally_dir / "ball_traj_2D.csv").exists()
             res.has_ball_3d = (rally_dir / "ball_traj_3D.csv").exists()
-            res.stages["ball"] = "ok"
+            res.stages["ball"] = "ok" if res.has_ball_3d else "ok (2D only)"
         except Exception as exc:
+            res.has_ball_2d = (rally_dir / "ball_traj_2D.csv").exists()
             res.stages["ball"] = f"error: {exc}"
             LOG.warning("[ball] %s failed: %s", rally_dir.name, exc)
     elif "ball" in stages:
         res.stages["ball"] = "skipped: no calibration"
 
+    # Finalize flags from disk so meta is accurate even when only a subset of
+    # stages ran this invocation (e.g. re-running just the ball stage).
+    res.calib_ok = res.calib_ok or (rally_dir / "camera.yaml").exists()
+    res.has_pose_p0 = res.has_pose_p0 or (rally_dir / "p0_3d.npy").exists()
+    res.has_pose_p1 = res.has_pose_p1 or (rally_dir / "p1_3d.npy").exists()
+    res.has_ball_2d = res.has_ball_2d or (rally_dir / "ball_traj_2D.csv").exists()
+    res.has_ball_3d = res.has_ball_3d or (rally_dir / "ball_traj_3D.csv").exists()
+
     res.ball_coverage = _ball_coverage(rally_dir)
-    res.ok = res.calib_ok and (res.has_ball_3d or (res.has_pose_p0 and res.has_pose_p1))
+    res.ok = res.calib_ok and (
+        res.has_ball_2d or res.has_ball_3d or (res.has_pose_p0 and res.has_pose_p1)
+    )
     _write_meta(rally_dir, res, meta_extra)
     return res
 
@@ -127,6 +140,7 @@ def _write_meta(rally_dir: Path, res: RallyResult, meta_extra: dict | None) -> N
     meta["quality"] = {
         "calib_ok": res.calib_ok,
         "ball_coverage": round(res.ball_coverage, 3),
+        "has_ball_2d": res.has_ball_2d,
         "has_ball_3d": res.has_ball_3d,
         "has_pose_p0": res.has_pose_p0,
         "has_pose_p1": res.has_pose_p1,
