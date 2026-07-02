@@ -5,9 +5,11 @@ canonical_fps: 25
 min_rally_seconds: 1.5
 max_rally_seconds: 40.0
 
-# BlurBall inference
+# BlurBall inference (0.5 keeps blurred fast-ball detections; 0.7 drops them)
 blurball_step: 1
-blurball_score_threshold: 0.7
+blurball_score_threshold: 0.5
+blurball_max_disp: 600
+ball_bridge_max_gap: 5
 
 # rtmlib 2D pose
 rtmpose_mode: balanced         # performance | balanced | lightweight

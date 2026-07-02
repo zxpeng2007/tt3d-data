@@ -67,9 +67,17 @@ class PipelineConfig:
     min_rally_seconds: float = MIN_RALLY_SECONDS
     max_rally_seconds: float = MAX_RALLY_SECONDS
 
-    # BlurBall inference
+    # BlurBall inference.
+    # score_threshold 0.5 (not the README's 0.7): fast balls blur into weak
+    # heatmap peaks, and 0.7 drops exactly those; the tracker gate + physics
+    # fit reject the extra false positives. max_disp raised for 25fps clips
+    # (per-frame displacement is 2x the native 50fps broadcast).
     blurball_step: int = 1
-    blurball_score_threshold: float = 0.7
+    blurball_score_threshold: float = 0.5
+    blurball_max_disp: int = 600
+    # bridge detection gaps up to this many missing frames with a local
+    # quadratic fit (marked Interp=1 in ball_traj_2D.csv)
+    ball_bridge_max_gap: int = 5
 
     # rtmlib 2D pose
     rtmpose_mode: str = "balanced"      # 'performance' | 'balanced' | 'lightweight'

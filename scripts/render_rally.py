@@ -230,10 +230,14 @@ def main() -> None:
     args = ap.parse_args()
     d = args.rally_dir
     out = d / "renders"; out.mkdir(exist_ok=True)
-    print("summary.png ..."); render_summary(d, out / "summary.png")
+    has_3d = (d / "ball_traj_3D.csv").exists()
+    if has_3d:
+        print("summary.png ..."); render_summary(d, out / "summary.png")
+    else:
+        print("no ball_traj_3D.csv — skipping summary/scene (2D overlay only)")
     if not args.skip_2d:
         print("overlay_2d.mp4 ..."); render_2d(d, out / "overlay_2d.mp4")
-    if not args.skip_3d:
+    if has_3d and not args.skip_3d:
         print("scene_3d.mp4 ..."); render_3d(d, out / "scene_3d.mp4")
     print("done ->", out)
 

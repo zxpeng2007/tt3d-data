@@ -45,6 +45,7 @@ def _blurball_2d(rally_dir: Path, cfg: config.PipelineConfig) -> Path:
          f"+input_vid={str(rally_mp4).replace(chr(92), '/')}",
          f"detector.step={cfg.blurball_step}",
          f"detector.postprocessor.score_threshold={cfg.blurball_score_threshold}",
+         f"tracker.max_disp={cfg.blurball_max_disp}",
          # Disable BlurBall's per-frame visualization (buggy draw_frame path); we
          # only need traj.csv, which is written regardless.
          "runner.vis_result=False", "runner.vis_hm=False", "runner.vis_traj=False",
@@ -62,8 +63,64 @@ def _blurball_2d(rally_dir: Path, cfg: config.PipelineConfig) -> Path:
             raise StageError(f"BlurBall produced no traj.csv under {rally_dir}")
         traj = hits[0]
     shutil.copyfile(traj, out_csv)
+    _bridge_gaps(out_csv, cfg)
     LOG.info("[ball] 2D detections -> %s", out_csv.name)
     return out_csv
+
+
+def _bridge_gaps(csv_path: Path, cfg: config.PipelineConfig) -> None:
+    """Fill short detection gaps with a local quadratic fit (smash recovery).
+
+    Fast balls blur into weak detections and drop out for a few frames right
+    when the trajectory is most interesting. Between two visible stretches the
+    2D path is smooth (projectile + projection), so a quadratic fit through
+    the nearest neighbours reconstructs the missing frames well. Filled rows
+    get Visibility=1 (so downstream TT3D uses them) and Interp=1 (so training
+    code can distinguish real detections from bridged ones).
+    """
+    import numpy as np
+    import pandas as pd
+
+    max_gap = int(getattr(cfg, "ball_bridge_max_gap", 0))
+    if max_gap <= 0:
+        return
+    df = pd.read_csv(csv_path)
+    # BlurBall writes X/Y as ints; the fitted fills are floats
+    for col in ("X", "Y", "L", "Theta"):
+        df[col] = df[col].astype(float)
+    if "Interp" not in df.columns:
+        df["Interp"] = 0
+    vis = df[df.Visibility != 0]
+    if len(vis) < 6:
+        return
+    vis_frames = vis.Frame.to_numpy()
+    n_filled = 0
+    for i in range(len(vis_frames) - 1):
+        f0, f1 = int(vis_frames[i]), int(vis_frames[i + 1])
+        gap = f1 - f0 - 1
+        if gap < 1 or gap > max_gap:
+            continue
+        # nearest visible neighbours on each side (up to 3 per side)
+        left = vis[vis.Frame <= f0].tail(3)
+        right = vis[vis.Frame >= f1].head(3)
+        support = pd.concat([left, right])
+        if len(support) < 4:
+            continue
+        t = support.Frame.to_numpy(dtype=float)
+        deg = 2 if len(support) >= 5 else 1
+        px = np.polyfit(t, support.X.to_numpy(dtype=float), deg)
+        py = np.polyfit(t, support.Y.to_numpy(dtype=float), deg)
+        for f in range(f0 + 1, f1):
+            x, y = float(np.polyval(px, f)), float(np.polyval(py, f))
+            m = df.Frame == f
+            if not m.any():
+                continue
+            df.loc[m, ["X", "Y", "Visibility", "Interp"]] = [x, y, 1, 1]
+            df.loc[m, ["L", "Theta"]] = [0.0, 0.0]
+            n_filled += 1
+    if n_filled:
+        df.to_csv(csv_path, index=False)
+        LOG.info("[ball] bridged %d frames across short gaps", n_filled)
 
 
 def _reconstruct_3d(rally_dir: Path, cfg: config.PipelineConfig) -> Path:
