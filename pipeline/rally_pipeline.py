@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import ball, body, config, pose2d, table, video
+from . import ball, body, config, pose2d, reorient, table, video
 from .procutil import LOG, ffprobe
 
 ALL_STAGES = ("canonical", "table", "body", "ball")
@@ -81,6 +81,10 @@ def process_rally(
         _write_meta(rally_dir, res, meta_extra)
         return res
 
+    # A calibration may already exist from a previous (partial) run — honour it
+    # so body/ball can run without re-selecting the table stage.
+    res.calib_ok = (rally_dir / "camera.yaml").exists()
+
     # --- table (camera calibration) ---------------------------------------
     if "table" in stages:
         try:
@@ -95,6 +99,9 @@ def process_rally(
     if "body" in stages and res.calib_ok:
         try:
             pose2d.generate_mb_input(rally_dir, res.n_frames, cfg, force=force)
+            # Resolve the 90-deg table corner-assignment ambiguity before any
+            # stage consumes camera.yaml (alignment + ball 3D depend on it).
+            reorient.check_and_fix(rally_dir)
             body.run_body(rally_dir, cfg, force=force)
             res.has_pose_p0 = (rally_dir / "p0_3d.npy").exists()
             res.has_pose_p1 = (rally_dir / "p1_3d.npy").exists()
