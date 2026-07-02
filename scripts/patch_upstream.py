@@ -33,6 +33,16 @@ def patch_rally() -> None:
         "(all_idx * 25).astype(np.uint8)",
         "(all_idx * fps).astype(np.int64)",
     )
+    # The per-segment plotting block curve_fits a 3-param polynomial; segments
+    # shorter than that crash scipy before the actual reconstruction runs.
+    src = src.replace(
+        "    for i in range(len(q_sol) - 1):\n"
+        "        t_temp = np.linspace(ts_exact[i], ts_exact[i + 1], 10)",
+        "    for i in range(len(q_sol) - 1):\n"
+        "        if q_sol[i + 1] - q_sol[i] < 4:\n"
+        "            continue  # patched: too few points to fit the plot polynomial\n"
+        "        t_temp = np.linspace(ts_exact[i], ts_exact[i + 1], 10)",
+    )
     if src != orig:
         f.write_text(src, encoding="utf-8")
         print("patched rally.py (fps + int64 index)")
