@@ -86,6 +86,7 @@ class PipelineConfig:
 
     # Rally segmentation thresholds
     table_presence_min: float = 0.02    # min table-mask frame fraction for gameplay
+    table_presence_max: float = 0.15    # above this it's a close-up/replay, not the wide shot
     gameplay_min_seconds: float = 2.0
     gameplay_merge_gap: float = 5.0     # bridge cutaways up to this many seconds
 

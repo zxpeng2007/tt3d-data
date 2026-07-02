@@ -30,14 +30,15 @@ from pipeline.procutil import LOG, ffprobe
 from pipeline.video import extract_clip
 
 
-def gameplay_timeline(video: Path, threshold: float) -> tuple[list[float], list[bool]]:
+def gameplay_timeline(video: Path, threshold: float, max_frac: float) -> tuple[list[float], list[bool]]:
     """Run the keyframe gameplay classifier; return (keyframe_times, gameplay_flags)."""
     env = {**os.environ, "MPLBACKEND": "Agg", "PYTHONUTF8": "1"}
     calib = config.TT3D_DIR / "tt3d" / "calibration"
     env["PYTHONPATH"] = os.pathsep.join([str(calib), env.get("PYTHONPATH", "")])
     cmd = [config.PYTHON,
            str((config.REPO_ROOT / "pipeline" / "gameplay_timeline.py").resolve()),
-           "--video", str(video), "--threshold", str(threshold)]
+           "--video", str(video), "--threshold", str(threshold),
+           "--max-frac", str(max_frac)]
     proc = subprocess.run(cmd, cwd=str(config.TT3D_DIR), env=env,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           text=True, encoding="utf-8", errors="replace")
@@ -90,7 +91,7 @@ def segment_match(video: Path, out_root: Path, cfg: config.PipelineConfig) -> in
     out_dir = out_root / match_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    times, flags = gameplay_timeline(video, cfg.table_presence_min)
+    times, flags = gameplay_timeline(video, cfg.table_presence_min, cfg.table_presence_max)
     n_game = sum(1 for f in flags if f)
     LOG.info("%s: %d keyframes, %d gameplay", match_id, len(flags), n_game)
 
