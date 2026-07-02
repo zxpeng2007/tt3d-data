@@ -12,6 +12,7 @@ blurball_max_disp: 600
 ball_bridge_max_gap: 5
 ball3d_max_reproj_px: 40.0   # 3D points straying farther from the 2D track are glitches
 ball3d_max_speed: 40.0       # m/s physical cap
+ball3d_fill_max_gap: 10      # fill interior 3D gaps from 2D ray + interpolated depth
 
 # rtmlib 2D pose
 rtmpose_mode: balanced         # performance | balanced | lightweight

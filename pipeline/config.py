@@ -84,6 +84,9 @@ class PipelineConfig:
     # Savitzky-Golay smooth each flight arc.
     ball3d_max_reproj_px: float = 40.0
     ball3d_max_speed: float = 40.0      # m/s; fastest recorded smashes ~32
+    # fill interior 3D gaps up to this many frames using the 2D ray with
+    # depth interpolated from bracketing 3D points (marked Interp=1)
+    ball3d_fill_max_gap: int = 10
 
     # rtmlib 2D pose
     rtmpose_mode: str = "balanced"      # 'performance' | 'balanced' | 'lightweight'

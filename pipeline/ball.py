@@ -210,7 +210,48 @@ def _refine_ball_3d(rally_dir: Path, cfg: config.PipelineConfig) -> None:
         df = df.drop(df.index[bad[0] + 1]).reset_index(drop=True)
         n_speed += 1
 
-    # 3) smooth each flight arc (split at bounces and frame gaps)
+    # 3) fill interior gaps: the same-frame 2D detection fixes the ball's ray
+    #    through the camera; only depth is unknown, and depth varies smoothly,
+    #    so interpolate it from the bracketing 3D points. Filled points
+    #    reproject exactly onto the 2D track by construction (Interp=1).
+    n_filled = 0
+    if b2_path.exists() and getattr(cfg, "ball3d_fill_max_gap", 0) > 0:
+        cam = yaml.safe_load(cam_path.read_text(encoding="utf-8"))
+        R, _ = cv2.Rodrigues(np.array(cam["rvec"], float))
+        t = np.array(cam["tvec"], float).ravel()
+        K = np.array([[cam["f"], 0, cam["w"] / 2],
+                      [0, cam["f"], cam["h"] / 2], [0, 0, 1]], float)
+        Kinv = np.linalg.inv(K)
+        b2 = pd.read_csv(b2_path)
+        b2 = b2[b2.Visibility != 0].drop_duplicates("Frame").set_index("Frame")
+        if "Interp" not in df.columns:
+            df["Interp"] = 0
+        fr_known = df["idx"].to_numpy(int)
+        # camera z-depth of every known point
+        zc = (df[["x", "y", "z"]].to_numpy() @ R.T + t)[:, 2]
+        new_rows = []
+        for i in range(1, len(fr_known)):
+            f0, f1 = fr_known[i - 1], fr_known[i]
+            gap = f1 - f0 - 1
+            if gap < 1 or gap > cfg.ball3d_fill_max_gap:
+                continue
+            for f in range(f0 + 1, f1):
+                if f not in b2.index:
+                    continue
+                row = b2.loc[f]
+                a = (f - f0) / (f1 - f0)
+                depth = (1 - a) * zc[i - 1] + a * zc[i]
+                d = Kinv @ np.array([float(row.X), float(row.Y), 1.0])
+                Xc = depth * d           # d_z == 1, so z_cam == depth
+                Xw = R.T @ (Xc - t)
+                new_rows.append({"idx": f, "x": Xw[0], "y": Xw[1], "z": Xw[2], "Interp": 1})
+        if new_rows:
+            n_filled = len(new_rows)
+            df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+            df = df.sort_values("idx").reset_index(drop=True)
+            df["Interp"] = df["Interp"].fillna(0).astype(int)
+
+    # 4) smooth each flight arc (split at bounces and frame gaps)
     fr = df["idx"].to_numpy(int)
     p = df[["x", "y", "z"]].to_numpy()
     z = p[:, 2]
@@ -230,8 +271,9 @@ def _refine_ball_3d(rally_dir: Path, cfg: config.PipelineConfig) -> None:
                 p[a:b, c] = savgol_filter(p[a:b, c], w, 2)
     df[["x", "y", "z"]] = p
     df.to_csv(csv_path, index=False)
-    LOG.info("[ball] refined 3D: %d -> %d pts (reproj-gated %d, speed-gated %d, %d arcs smoothed)",
-             n0, len(df), n_reproj, n_speed, len(starts) - 1)
+    LOG.info("[ball] refined 3D: %d -> %d pts (reproj-gated %d, speed-gated %d, "
+             "%d gap-filled, %d arcs smoothed)",
+             n0, len(df), n_reproj, n_speed, n_filled, len(starts) - 1)
 
 
 def _filter_ball_3d(csv_path: Path, cfg: config.PipelineConfig) -> None:
