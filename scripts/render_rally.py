@@ -80,6 +80,18 @@ def _ball_by_frame(rally_dir: Path, n_frames: int):
     return pos, xs, df
 
 
+def _gap_break(frames, pts, max_gap: int = 3):
+    """Insert NaN rows where consecutive frames are more than max_gap apart so
+    matplotlib breaks the line instead of drawing a straight glitch segment."""
+    pts = np.asarray(pts, float)
+    out = []
+    for i, p in enumerate(pts):
+        if i and frames[i] - frames[i - 1] > max_gap:
+            out.append([np.nan] * pts.shape[1])
+        out.append(p)
+    return np.array(out)
+
+
 # ----------------------------- 2D overlay -----------------------------------
 def render_2d(rally_dir: Path, out: Path) -> None:
     cap = cv2.VideoCapture(str(rally_dir / "rally.mp4"))
@@ -172,9 +184,10 @@ def render_3d(rally_dir: Path, out: Path) -> None:
         _draw_skel(ax, p0[i], "#1f77ff"); _draw_skel(ax, p1[i], "#ff3b3b")
         seen = xs[xs <= i]
         if len(seen):
-            tr = np.array([pos[k] for k in seen])
+            tr = _gap_break(seen, [pos[k] for k in seen])
             ax.plot(tr[:, 0], tr[:, 1], tr[:, 2], color="#00c000", lw=1.5, alpha=0.7)
-            ax.scatter(*tr[-1], color="#00c000", s=40)
+            last = np.array(pos[seen[-1]])
+            ax.scatter(*last, color="#00c000", s=40)
         _setup(ax, bt); ax.view_init(elev=18, azim=-70)
         fig.tight_layout()
         fig.canvas.draw()
@@ -189,7 +202,7 @@ def render_summary(rally_dir: Path, out: Path) -> None:
     p0 = np.load(rally_dir / "p0_3d.npy"); p1 = np.load(rally_dir / "p1_3d.npy")
     n = min(len(p0), len(p1))
     pos, xs, df = _ball_by_frame(rally_dir, n)
-    bt = np.array([pos[k] for k in xs])
+    bt = _gap_break(xs, [pos[k] for k in xs])
     mid = xs[len(xs) // 2]
 
     fig = plt.figure(figsize=(15, 4.5))
@@ -216,7 +229,8 @@ def render_summary(rally_dir: Path, out: Path) -> None:
     ax3.set_title("Ball flight (side Y-Z)"); ax3.set_xlabel("Y (m)"); ax3.set_ylabel("Z height (m)")
     # ball height vs frame
     ax4 = fig.add_subplot(144)
-    ax4.plot(xs, bt[:, 2], "-o", color="#00c000", ms=3)
+    xs_b = _gap_break(xs, np.asarray(xs, float).reshape(-1, 1))[:, 0]
+    ax4.plot(xs_b, bt[:, 2], "-o", color="#00c000", ms=3)
     ax4.axhline(0, color="#1f6f4a", lw=1)
     ax4.set_title("Ball height vs frame"); ax4.set_xlabel("frame"); ax4.set_ylabel("Z (m)")
     fig.tight_layout(); fig.savefig(out, dpi=110); plt.close(fig)

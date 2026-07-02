@@ -10,6 +10,8 @@ blurball_step: 1
 blurball_score_threshold: 0.5
 blurball_max_disp: 600
 ball_bridge_max_gap: 5
+ball3d_max_reproj_px: 40.0   # 3D points straying farther from the 2D track are glitches
+ball3d_max_speed: 40.0       # m/s physical cap
 
 # rtmlib 2D pose
 rtmpose_mode: balanced         # performance | balanced | lightweight

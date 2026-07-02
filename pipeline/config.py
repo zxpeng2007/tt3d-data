@@ -79,6 +79,12 @@ class PipelineConfig:
     # quadratic fit (marked Interp=1 in ball_traj_2D.csv)
     ball_bridge_max_gap: int = 5
 
+    # 3D ball refinement: reject reconstructed points that stray from the
+    # (trusted, smooth) 2D track, cap physically impossible speeds, and
+    # Savitzky-Golay smooth each flight arc.
+    ball3d_max_reproj_px: float = 40.0
+    ball3d_max_speed: float = 40.0      # m/s; fastest recorded smashes ~32
+
     # rtmlib 2D pose
     rtmpose_mode: str = "balanced"      # 'performance' | 'balanced' | 'lightweight'
     det_score_threshold: float = 0.45

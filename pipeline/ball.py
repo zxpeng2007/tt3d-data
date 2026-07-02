@@ -142,7 +142,96 @@ def _reconstruct_3d(rally_dir: Path, cfg: config.PipelineConfig) -> Path:
     if not out_csv.exists():
         raise StageError(f"rally.py did not produce {out_csv}")
     _filter_ball_3d(out_csv, cfg)
+    _refine_ball_3d(rally_dir, cfg)
     return out_csv
+
+
+def _refine_ball_3d(rally_dir: Path, cfg: config.PipelineConfig) -> None:
+    """Remove glitches from the reconstructed 3D trajectory.
+
+    rally.py solves each bounce-to-bounce flight independently and averages
+    overlapping rebuilds, so bad segment fits inject spikes even when the 2D
+    track is smooth. Refinement uses what we trust:
+      1. reprojection gate: a 3D point must land near the 2D detection of the
+         same frame when projected through the calibrated camera;
+      2. speed gate: consecutive points implying > ball3d_max_speed are wrong;
+      3. Savitzky-Golay (order 2) smoothing per flight arc -- exactly preserves
+         parabolic flight, kills fit jitter; runs split at bounces and frame
+         gaps so contact kinks stay sharp.
+    """
+    import cv2
+    import numpy as np
+    import pandas as pd
+    import yaml
+    from scipy.signal import savgol_filter
+
+    csv_path = rally_dir / "ball_traj_3D.csv"
+    cam_path = rally_dir / "camera.yaml"
+    if not csv_path.exists() or not cam_path.exists():
+        return
+    df = pd.read_csv(csv_path).drop_duplicates("idx").sort_values("idx").reset_index(drop=True)
+    n0 = len(df)
+    if n0 < 5:
+        return
+
+    # 1) reprojection gate against the 2D track
+    b2_path = rally_dir / "ball_traj_2D.csv"
+    n_reproj = 0
+    if b2_path.exists():
+        cam = yaml.safe_load(cam_path.read_text(encoding="utf-8"))
+        rv = np.array(cam["rvec"], float).reshape(3, 1)
+        tv = np.array(cam["tvec"], float).reshape(3, 1)
+        K = np.array([[cam["f"], 0, cam["w"] / 2],
+                      [0, cam["f"], cam["h"] / 2], [0, 0, 1]], float)
+        proj, _ = cv2.projectPoints(
+            df[["x", "y", "z"]].to_numpy().reshape(-1, 1, 3), rv, tv, K, None)
+        proj = proj.reshape(-1, 2)
+        b2 = pd.read_csv(b2_path)
+        b2 = b2[b2.Visibility != 0].drop_duplicates("Frame").set_index("Frame")
+        err = np.full(n0, np.nan)
+        for i, fr in enumerate(df["idx"].astype(int)):
+            if fr in b2.index:
+                row = b2.loc[fr]
+                err[i] = np.hypot(proj[i, 0] - float(row.X), proj[i, 1] - float(row.Y))
+        keep = ~(err > cfg.ball3d_max_reproj_px)   # NaN (no 2D that frame) is kept
+        n_reproj = int((~keep).sum())
+        df = df[keep].reset_index(drop=True)
+
+    # 2) physical speed gate (iterative: drop the offending later point)
+    n_speed = 0
+    while len(df) > 3:
+        p = df[["x", "y", "z"]].to_numpy()
+        fr = df["idx"].to_numpy(float)
+        dt = np.maximum(np.diff(fr), 1.0) / cfg.canonical_fps
+        v = np.linalg.norm(np.diff(p, axis=0), axis=1) / dt
+        bad = np.where(v > cfg.ball3d_max_speed)[0]
+        if not len(bad):
+            break
+        df = df.drop(df.index[bad[0] + 1]).reset_index(drop=True)
+        n_speed += 1
+
+    # 3) smooth each flight arc (split at bounces and frame gaps)
+    fr = df["idx"].to_numpy(int)
+    p = df[["x", "y", "z"]].to_numpy()
+    z = p[:, 2]
+    starts = [0]
+    for i in range(1, len(df)):
+        is_bounce = (i < len(df) - 1 and z[i] < 0.08
+                     and z[i] <= z[i - 1] and z[i] <= z[i + 1])
+        if fr[i] - fr[i - 1] > 2 or is_bounce:
+            starts.append(i)
+    starts.append(len(df))
+    for a, b in zip(starts[:-1], starts[1:]):
+        m = b - a
+        if m >= 5:
+            w = m if m % 2 == 1 else m - 1
+            w = min(9, w)
+            for c in range(3):
+                p[a:b, c] = savgol_filter(p[a:b, c], w, 2)
+    df[["x", "y", "z"]] = p
+    df.to_csv(csv_path, index=False)
+    LOG.info("[ball] refined 3D: %d -> %d pts (reproj-gated %d, speed-gated %d, %d arcs smoothed)",
+             n0, len(df), n_reproj, n_speed, len(starts) - 1)
 
 
 def _filter_ball_3d(csv_path: Path, cfg: config.PipelineConfig) -> None:
