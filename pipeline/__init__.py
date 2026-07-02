@@ -1,9 +1,10 @@
-"""tt3d-data: scaled table-tennis 3D data generation pipeline.
+"""rally3d: 3D table-tennis data from broadcast video.
 
-Wraps the upstream TT3D method (calibration, pose alignment, ball reconstruction),
-BlurBall (2D ball detection) and MotionBERT (2D->3D pose lifting) into a batch
-pipeline that turns many broadcast matches into a training dataset of ball
-position, human body pose and table position.
+End-to-end pipeline that turns full-match footage into synchronized metric 3D
+training data — ball trajectory, player body pose, and table/camera geometry —
+from a single camera. Original orchestration, segmentation, calibration
+disambiguation and trajectory refinement, building on open research components
+(TT3D calibration/physics, BlurBall detection, MotionBERT lifting, RTMPose).
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

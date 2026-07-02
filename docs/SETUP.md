@@ -4,7 +4,7 @@ Verified on Windows 11, NVIDIA RTX 5080 (Blackwell, sm_120), CUDA driver 13.1.
 
 ## 1. Python 3.12 environment
 
-The ML stack (MotionBERT, TT3D, table segmenter) targets Python ≤3.12; 3.13/3.14
+The ML stack (MotionBERT, the vendored research components, table segmenter) targets Python ≤3.12; 3.13/3.14
 are too new. `scripts/setup_env.py` creates an isolated `.venv` using a Python 3.12
 interpreter (the `py -V:Astral/CPython3.12*` launcher or any `python3.12` on PATH).
 

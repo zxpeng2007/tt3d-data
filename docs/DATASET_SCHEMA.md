@@ -21,7 +21,7 @@ top-level `data/dataset/dataset_card.json`.
 ```
 
 ### `camera.yaml`
-Calibrated monocular camera for the rally (from TT3D calibration). Intrinsics (focal length, optical
+Calibrated monocular camera for the rally (solved from the table's known geometry). Intrinsics (focal length, optical
 center) and extrinsics (rotation + translation, table→camera). For static cameras a single filtered
 pose; for moving cameras, `cam_cal.csv` holds the per-frame track.
 

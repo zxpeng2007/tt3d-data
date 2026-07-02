@@ -1,10 +1,10 @@
 # Build status
 
-The pipeline is validated end-to-end on real WTT footage and generating data.
+rally3d is validated end-to-end on real WTT footage and generating data.
 
 | # | Stage | State | Notes |
 |---|-------|-------|-------|
-| 0-1 | GitHub repo (`zxpeng2007/tt3d-data`) + scaffold | ✅ done | |
+| 0-1 | GitHub repo (`zxpeng2007/rally3d`) + scaffold | ✅ done | |
 | 2-4 | Env: py3.12 venv, torch cu128 GPU, deps | ✅ done | onnxruntime-gpu CUDA provider |
 | 5-7 | Vendored upstream, patches, weights | ✅ done | table-seg, BlurBall, MotionBERT, RTMPose |
 | 8 | Pipeline code (all stages) | ✅ done | |

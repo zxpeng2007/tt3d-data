@@ -1,81 +1,92 @@
-# tt3d-data
+# rally3d
 
-**Scaled 3D table-tennis data generation.** This repo turns large amounts of real table-tennis
-match footage into a training dataset of **ball position**, **human body pose**, and **table
-position** in 3D, by running the [TT3D](https://github.com/cogsys-tuebingen/tt3d) reconstruction
-method (Gossard, Ziegler & Zell, *TT3D: Table Tennis 3D Reconstruction*, CVPR-W 2025) over many
-broadcast matches instead of a single example rally.
+**3D table-tennis data from ordinary broadcast video.** rally3d is an end-to-end system that
+turns full-match footage into synchronized, metric 3D training data — **ball trajectory**,
+**player body pose**, and **table/camera geometry** — at dataset scale, from a single camera.
 
-Where upstream TT3D ships a one-rally demo, this repo adds the missing pieces to run it **at scale**:
+![tracking overlay](data/dataset/samples/r0009_tracking_overlay.png)
 
-1. **Source** — bulk-download full WTT/ITTF broadcast matches with `yt-dlp`.
-2. **Segment** — automatically split each match into individual **rally clips** (gameplay-only).
-3. **Reconstruct** — run the full TT3D pipeline per rally:
-   - **Table** — table segmentation + monocular camera calibration.
-   - **Body** — RTMPose (2D) → MotionBERT (2D→3D) → world-frame alignment, per player.
-   - **Ball** — [BlurBall](https://github.com/cogsys-tuebingen/blurball) 2D detection → physics-based
-     3D trajectory reconstruction.
-4. **Aggregate** — collect every rally's outputs into one versioned dataset with a manifest.
+For every rally it reconstructs, rally3d produces (see [`docs/DATASET_SCHEMA.md`](docs/DATASET_SCHEMA.md)):
 
-> ⚠️ **Footage is copyrighted.** Downloaded videos are used only as private inputs for research
-> training data and are **git-ignored** — this repo never redistributes broadcast footage. Only the
-> code and (optionally) derived numeric annotations are versioned.
-
----
-
-## What each rally produces
-
-For every reconstructed rally you get (see [`docs/DATASET_SCHEMA.md`](docs/DATASET_SCHEMA.md)):
-
-| File | Contents |
+| Output | Contents |
 | --- | --- |
-| `camera.yaml` | Calibrated camera intrinsics + extrinsics (table→camera) |
-| `ball_traj_2D.csv` | Per-frame 2D ball detections (+ motion-blur cue) from BlurBall |
-| `ball_traj_3D.csv` | Reconstructed 3D ball trajectory (position, velocity, spin) |
-| `p0_3d.npy`, `p1_3d.npy` | 3D body pose (17 joints) per player, in the table/world frame |
-| `meta.json` | Source video id, rally span, fps, quality flags |
+| `camera.yaml` | Calibrated monocular camera (pose + focal), table = world origin |
+| `ball_traj_2D.csv` | Per-frame ball detections with motion-blur cues (`Interp` flags bridged frames) |
+| `ball_traj_3D.csv` | Metric 3D ball trajectory with bounces (`Interp` flags ray-filled frames) |
+| `p0_3d.npy`, `p1_3d.npy` | Both players' 3D joints `(frames, 17, 3)`, world frame, metres |
+| `table.json`, `meta.json` | Table geometry constants, provenance + quality metrics |
 
----
+## How it works
 
-## Status
+```
+WTT/ITTF broadcasts ─► match sourcing ─► rally segmentation ─► per-rally reconstruction ─► dataset
+   (yt-dlp, budgeted)   (table-presence     (table │ body │ ball)      (manifest + card)
+                         keyframe timeline)
+```
 
-This repo is under active build-out. See [`docs/BUILD_STATUS.md`](docs/BUILD_STATUS.md) for the current
-state of each stage (environment, weights, per-stage validation, bulk run).
+1. **Sourcing** — bulk-downloads singles full matches with a **per-player footage budget**
+   (default 5 h/player) so the dataset stays small and diverse.
+2. **Rally segmentation** — a one-pass keyframe timeline classifies gameplay by table presence,
+   with a **wide-shot filter** (mask size, border contact, width span) that rejects close-up
+   replays; consecutive gameplay keyframes merge into rally clips.
+3. **Table / camera** — the table's known geometry (2.74 × 1.525 m) calibrates the camera from
+   segmentation-detected corners. A rectangle's corner correspondence is 90°-ambiguous, so
+   rally3d adds a **physical disambiguation**: it re-solves the alternative assignment and keeps
+   the camera that places both players behind opposite table ends (ankles ray-cast to the floor).
+4. **Body** — mmcv-free 2D pose (RTMPose via `rtmlib`) with IoU tracking and player selection,
+   MotionBERT 2D→3D lifting, then world-frame alignment by minimizing reprojection error at
+   foot-contact frames.
+5. **Ball** — blur-aware detection (BlurBall) tuned for high-speed play (low threshold, wide
+   tracker gate), **quadratic bridging** of short 2D dropouts, physics-based 3D reconstruction,
+   then a refinement chain: reprojection gating against the 2D track, physical speed caps,
+   **ray-depth filling** of interior gaps (2D detection fixes the ray; depth interpolates
+   smoothly), and parabola-preserving Savitzky–Golay smoothing per flight arc.
+6. **Orchestration** — everything is resumable and quality-gated per rally; a manifest
+   (`manifest.parquet` + `dataset_card.json`) aggregates the corpus. All synthetic points are
+   flagged (`Interp`), so the data stays honest about measured vs inferred.
 
 ## Setup
 
-Full, machine-specific setup lives in [`docs/SETUP.md`](docs/SETUP.md). In short:
+Full machine-specific instructions in [`docs/SETUP.md`](docs/SETUP.md). In short:
 
 ```bash
-# 1. Create the isolated Python 3.12 environment and install the stack
-python scripts/setup_env.py
-
-# 2. Fetch upstream method repos (TT3D, BlurBall, MotionBERT) and model weights
-python scripts/download_weights.py
-
-# 3. Validate the pipeline end-to-end on the bundled sample rally
-python scripts/run_pipeline.py --rally-dir data/dataset/samples/demo_rally --stages all
+python scripts/setup_env.py          # Python 3.12 venv + CUDA torch + deps + upstream patches
+python scripts/download_weights.py   # table-seg, BlurBall, MotionBERT (RTMPose auto-downloads)
 ```
 
-## Generating data at scale
+## Generating data
 
 ```bash
-# Download N full matches from the configured WTT/ITTF sources
-python scripts/download_videos.py --config configs/sources.yaml --limit 100
-
-# Split every downloaded match into rally clips
+python scripts/run_bulk.py                        # download → segment → reconstruct → aggregate
+# or stage by stage:
+python scripts/download_videos.py --max-hours-per-player 5
 python scripts/segment_rallies.py --videos data/videos --out data/rallies
-
-# Run the full reconstruction over every rally (resumable, GPU)
-python scripts/batch_generate.py --rallies data/rallies --out data/dataset
-
-# Build the consolidated dataset + manifest
+python scripts/batch_generate.py  --rallies data/rallies --out data/dataset
 python scripts/aggregate_dataset.py --dataset data/dataset
 ```
 
-## Attribution
+Inspect any rally visually (2D overlay with projected table, 3D scene animation, summary plots):
 
-This project is a data-scaling wrapper around research by others. Please cite the original work:
+```bash
+python scripts/render_rally.py --rally-dir data/dataset/rallies/<match>/<rally>
+```
+
+![3D reconstruction](data/dataset/samples/r0009_reconstruction_summary.png)
+
+> ⚠️ **Footage is copyrighted.** Downloaded videos are private research inputs only — they are
+> git-ignored and never redistributed. Only code and derived numeric annotations live here.
+
+## Acknowledgements
+
+rally3d was inspired by **TT3D** (Gossard, Ziegler & Zell, *TT3D: Table Tennis 3D
+Reconstruction*, CVPR-W 2025) and builds on excellent open research components:
+[TT3D](https://github.com/cogsys-tuebingen/tt3d) (table segmentation model, calibration
+optimizer, ball physics solver), [BlurBall](https://github.com/cogsys-tuebingen/blurball)
+(blur-aware ball detection), [MotionBERT](https://github.com/Walter0807/MotionBERT) (2D→3D
+lifting), and [RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose)
+(2D pose). Each retains its own license; see [`third_party/README.md`](third_party/README.md).
+
+If you use the TT3D components, please cite:
 
 ```bibtex
 @InProceedings{gossard2025,
@@ -86,9 +97,3 @@ This project is a data-scaling wrapper around research by others. Please cite th
   year      = {2025}
 }
 ```
-
-Upstream components: [TT3D](https://github.com/cogsys-tuebingen/tt3d),
-[BlurBall](https://github.com/cogsys-tuebingen/blurball),
-[RTMPose](https://github.com/open-mmlab/mmpose/tree/main/projects/rtmpose),
-[MotionBERT](https://github.com/Walter0807/MotionBERT). Each retains its own license; see
-[`third_party/README.md`](third_party/README.md).
